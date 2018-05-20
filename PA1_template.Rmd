@@ -1,25 +1,132 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research Week2 Project"
+output: html_document
 ---
 
+Let's load the packages.
 
-## Loading and preprocessing the data
+```{r load-packages, message=FALSE}
+library(ggplot2)
+library(lattice)
+```
+
+## Load the data
 
 
+```{r load, echo = TRUE}
+activitydata<-read.csv("activity.csv",stringsAsFactors=FALSE)
+# Transform the date attribute to an actual date format
+activitydata$date <- as.POSIXct(activitydata$date, format="%Y-%m-%d")
+```
 
+
+### Create a new factor variables with two level-"weekday" and "weekend"
+```{r weekday}
+# Compute the weekdays from the date attribute
+activity_1<- data.frame(date=activitydata$date, 
+                           weekday=tolower(weekdays(activitydata$date)), 
+                           steps=activitydata$steps, 
+                           interval=activitydata$interval)
+
+# Compute the day type (weekend or weekday)
+activity_1 <- cbind(activity_1, 
+                      daytype=ifelse(activity_1$weekday == "saturday" | 
+                                     activity_1$weekday == "sunday", "weekend", 
+                                     "weekday"))
+
+# Create the final data.frame
+activity <- data.frame(date=activity_1$date, 
+                       weekday=activity_1$weekday, 
+                       daytype=activity_1$daytype, 
+                       interval=activity_1$interval,
+                       steps=activity_1$steps)
+
+# Clear the workspace
+rm(activity_1)
+```
 ## What is mean total number of steps taken per day?
 
 
+```{r mean steps,echo = TRUE}
+totalsteps<-tapply(activity$steps,activity$date, FUN = sum, na.rm = TRUE)
+hist(totalsteps, col = "green", xlab = "Total number of steps taken each day")
+```
 
-## What is the average daily activity pattern?
+```{r mean and median}
+mean(totalsteps,na.rm = TRUE)
+median(totalsteps, na.rm = TRUE)
+```
 
+## What is the avearge daily activity pattern?
+
+```{r average}
+average<-aggregate(x = list(meansteps = activity$steps), by = list(interval = activity$interval), FUN = mean, na.rm = TRUE)
+ggplot(data = average, 
+       aes(x = interval, y = meansteps))+ 
+      geom_line()+ 
+    xlab("5 min interval")+
+    ylab("average number of steps taken")
+
+```
+
+```{r max}
+average[which.max(average$meansteps),]
+```
 
 
 ## Imputing missing values
+### Calcuulate and report the missing values in dataset
+```{r missing}
+missing<-is.na(activitydata$steps)
+table(missing)
+```
+### Devise a startegy for filling in all of the missing values and create a new dataset
+
+We use the startegy of using the mean data for filling the missing values in datasets
+
+```{r filling missing value}
+napos<- which(is.na(activity$steps))
+mean_vect<- rep(mean(activity$steps,na.rm = TRUE), times = length(napos))
+activity[missing,"steps"]<- mean_vect
+head(activity)
+```
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+### Mke a histogram of the total number of steps taken and report mean and median per day.
+
+```{r hist}
+sum<-aggregate(activity$steps, by = list(interval = activity$date), FUN = sum, na.rm = TRUE)
+names(sum)<- c("date","total")
+hist(sum$total,
+     breaks=seq(from=0, to=25000, by=2500),
+     col = "green",
+     xlab = "Total number of steps",
+main = "Histogram of total number of steps")
+```
+
+
+```{r mean2 and median2}
+mean(sum$total)
+median(sum$total)
+```
+
+
+## Are there any difference in activity patterns between weekdays and weekdends?
+
+
+### Make a panel plot containing a time series plot of 5 min interval and average nymber of steps taken
+
+```{r another plot}
+meandata<- aggregate(activity$steps, 
+                       by=list(activity$daytype, 
+                               activity$weekday, activity$interval), mean)
+
+# Rename the attributes
+names(meandata) <- c("daytype", "weekday", "interval", "mean")
+xyplot(mean~interval|daytype,meandata,
+       type = "l",
+       xlab = "Interval",
+       ylab = "Number of steps",
+       layout = c(1,2))
+```
